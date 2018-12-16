@@ -2,6 +2,7 @@ import semantic_version as sv
 import json
 import os
 import re
+import operator
 
 class CheckVersion():
   def __init__(self, VersionRangeList, VersionToCheck):
@@ -19,6 +20,31 @@ class CheckVersion():
     self.RawVersionToCheck = self.VersionToCheckPrefixHelper(VersionToCheck) #Stores string
     self.VersionToCheck = sv.Version.coerce(self.RawVersionToCheck.lower()) #Stores Semantic Version object
     self.ManualInspectionFileName = os.path.join('experiments', 'vulnerabilities', 'ManualInspectionLog.txt')
+
+
+  
+  def FixVersionRegex(self, Version):
+    """
+    Regex currently messes up version such as v2-1.2.3.4-alpha1 since it captures 2-1.2.3.4 as the version token.
+    This addresses that.
+    """
+    Delimiters = '-_.'
+    DelimiterDict = {'-':0, '_':0, '.':0}
+    for character in Version:
+      if character in Delimiters:
+        DelimiterDict[character] += 1
+
+    DominantDelimiter = max(DelimiterDict.items(), key=operator.itemgetter(1))[0] #Finds the delimiter with the max count
+    Delimiters = ''.join([i for i in Delimiters if i!=DominantDelimiter])
+    for delimiter in Delimiters:
+      Tokens = Version.split(delimiter)
+      for Token in Tokens:
+        if DominantDelimiter in Token:
+          Version = Token
+          
+    return Version
+          
+
     
   
   def VersionToCheckPrefixHelper(self, versionToCheck):
@@ -29,7 +55,7 @@ class CheckVersion():
     Checks prefix, if true, recreates version by appending the prefix.
     """
     Version = re.search(self.regexVersionPattern, versionToCheck).group(1) #Only select the first version group in case the suffix has another 1.2..
-
+    Version = self.FixVersionRegex(Version)
     VersionParts = versionToCheck.split(Version)
     Prefix = ''.join(i for i in VersionParts[0] if i.isalnum())
     Suffix = ''.join(i for i in VersionParts[1] if i.isalnum())
@@ -135,6 +161,7 @@ if __name__ == "__main__":
   """
   VersionRange = ['[3.2-alpha,3.3-beta-2)']
   Versions = CheckVersion(VersionRange, '3.3-alpha')
+  print('Test for fixing v2-1.2.3.4-alpha: ', Versions.FixVersionRegex('v2-1.2.3.4-alpha'))
   
   print("Checking {} in {}".format('3.3-alpha', str(VersionRange)))
   print(Versions.CheckVersionInRange() == True)
@@ -204,7 +231,9 @@ if __name__ == "__main__":
   print(Versions.CheckVersionInRange() == True)
 
   VersionRangePrefix = ['[jenkins_1-2-3_alpha, prototype-1-7-beta]'] #Adopted from the Jenkins github repo
-  Versions = CheckVersion(VersionRangePrefix, 'jenkins_1-7-beta')
+  Versions = CheckVersion(VersionRangePrefix, 'jenkins1_1-7-beta')
 
-  print("Checking {} in {}".format('jenkins_1-7.beta', str(VersionRangePrefix)))
+  print("Checking {} in {}".format('jenkins1_1-7.beta', str(VersionRangePrefix)))
   print(Versions.CheckVersionInRange() == True)
+
+  
