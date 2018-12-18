@@ -2,11 +2,13 @@ import argparse
 import json
 import re
 
+import snyk
+
 from pymongo import MongoClient, UpdateOne
 from pymongo.errors import ConnectionFailure
 
 
-def wrap_mongo_objects(repo_address, vulnerability_id, patch_commit_hash, patch_evaluation_results):
+def wrap_mongo_objects(repo_address, vulnerability_id, cve_id, patch_commit_hash, patch_evaluation_results):
     """
         Converts patch detector results into objects insertable into a MongoDB. Objects can be identified by
         (repo_address, vulnerability_id, patch_commit_hash).
@@ -29,7 +31,7 @@ def wrap_mongo_objects(repo_address, vulnerability_id, patch_commit_hash, patch_
             new_breakdown.append(file_stats)
         results["breakdown"] = new_breakdown
 
-        obj = {"repository": repo_address, "version": version, "vulnerability_id": vulnerability_id,
+        obj = {"repository": repo_address, "version": version, "vulnerability_id": vulnerability_id, "cve_id": cve_id,
                "commit": patch_commit_hash,
                "results": results}
         objs.append(obj)
@@ -37,8 +39,8 @@ def wrap_mongo_objects(repo_address, vulnerability_id, patch_commit_hash, patch_
     return objs
 
 
-def save_vulnerability_results(host, username, password, database, repo_address, vulnerability_id, patch_commit_hash,
-                               patch_evaluation_results):
+def save_vulnerability_results(host, username, password, database, repo_address, vulnerability_id, cve_id,
+                               patch_commit_hash, patch_evaluation_results):
     client = MongoClient("mongodb://{}:{}@{}:27017".format(username, password, host))
     db = client[database]
 
@@ -51,7 +53,7 @@ def save_vulnerability_results(host, username, password, database, repo_address,
 
     collection = db.vulnerabilities
 
-    mongo_objects = wrap_mongo_objects(repo_address, vulnerability_id, patch_commit_hash, patch_evaluation_results)
+    mongo_objects = wrap_mongo_objects(repo_address, vulnerability_id, cve_id, patch_commit_hash, patch_evaluation_results)
 
     if mongo_objects and len(mongo_objects) > 0:
 
@@ -65,6 +67,8 @@ def save_vulnerability_results(host, username, password, database, repo_address,
 
         if success:
             print("Persisted vulnerability {} with hash {}".format(vulnerability_id, patch_commit_hash))
+        else:
+            print("Vulnerability {} not persisted".format(vulnerability_id))
     else:
         print("Nothing persisted from vulnerability {} with hash {}".format(vulnerability_id, patch_commit_hash))
         success = True
@@ -186,7 +190,10 @@ def get_oracle(vulnerability_id, version):
 
         vulnerabilities_map[vulnerability_id] = vulnerable_versions
 
-    return version in vulnerable_versions
+    if version not in vulnerable_versions:
+        return snyk.get_oracle_data(vulnerability_id, version)
+    else:
+        return True
 
 
 if __name__ == '__main__':
