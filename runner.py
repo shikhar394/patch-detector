@@ -172,11 +172,9 @@ def run_git(config, detection_call):
     except AssertionError:
         error('assertion failed!')
         version_results = None
-        raise
     except Exception as e:
         error(str(e))
         version_results = None
-        raise
     finally:
         print('\r', end='')
 
