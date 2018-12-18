@@ -6,31 +6,52 @@ import re
 class CheckVersion():
     def __init__(self, VersionRangeList, VersionToCheck):
         """
-    Inputs 
-    - a list of versions in str format from the file generated from generate_SNYK_vulnerabilities
-      - Example: ["[3.2-alpha,3.3-beta-2)"] 
-      - Splits up by the ','. Hence, every range exists in the following format
-        - ['[3.2-alpha', '3.3-beta-2)']
-    - Version to check in the intervals
-    """
+        Inputs 
+        - a list of versions in str format from the file generated from generate_SNYK_vulnerabilities
+        - Example: ["[3.2-alpha,3.3-beta-2)"] 
+        - Splits up by the ','. Hence, every range exists in the following format
+            - ['[3.2-alpha', '3.3-beta-2)']
+        - Version to check in the intervals
+        """
         self.RawVersionRange = VersionRangeList
-        self.regexVersionPattern = r'(\d+(\.\d+){0,})(.*?)'
+        self.regexVersionPattern = r'(\d+(\.\d+|\_\d+|\-\d+){0,})(.*?)' #Identifies versions such as 1.2.3.4 | 1-2-3-4 | 1_2_3_4
         self.VersionRangeInput = [interval.lower().strip() for versionRange in VersionRangeList for interval in
-                                  versionRange.split(',')]
+                                    versionRange.split(',')]
         self.RawVersionToCheck = self.VersionToCheckPrefixHelper(VersionToCheck)  # Stores string
         self.VersionToCheck = sv.Version.coerce(self.RawVersionToCheck.lower())  # Stores Semantic Version object
         self.ManualInspectionFileName = os.path.join('experiments', 'vulnerabilities', 'ManualInspectionLog.txt')
 
+    def FixVersionRegex(self, Version):
+        """
+        Regex currently messes up version such as v2-1.2.3.4-alpha1 since it captures 2-1.2.3.4 as the version token.
+        This addresses that.
+        """
+        Delimiters = '-_.'
+        DelimiterDict = {'-':0, '_':0, '.':0}
+        for character in Version:
+            if character in Delimiters:
+                DelimiterDict[character] += 1
+
+        DominantDelimiter = max(DelimiterDict.items(), key=operator.itemgetter(1))[0] #Finds the delimiter with the max count
+        Delimiters = ''.join([i for i in Delimiters if i!=DominantDelimiter])
+        for delimiter in Delimiters:
+            Tokens = Version.split(delimiter)
+            for Token in Tokens:
+                if DominantDelimiter in Token:
+                    Version = Token
+            
+        return Version
+    
     def VersionToCheckPrefixHelper(self, versionToCheck):
         """
-    Addresses version prefix for VersionToCheck parameter.
-    Format: 'Jenkins-1.2.3'
-    Splits from '-'
-    Checks prefix, if true, recreates version by appending the prefix.
-    """
+        Addresses version prefix for VersionToCheck parameter.
+        Format: 'Jenkins-1.2.3'
+        Splits from '-'
+        Checks prefix, if true, recreates version by appending the prefix.
+        """
         Version = re.search(self.regexVersionPattern, versionToCheck).group(
             1)  # Only select the first version group in case the suffix has another 1.2..
-
+        
         VersionParts = versionToCheck.split(Version)
         Prefix = ''.join(i for i in VersionParts[0] if i.isalnum())
         Suffix = ''.join(i for i in VersionParts[1] if i.isalnum())
@@ -38,10 +59,10 @@ class CheckVersion():
 
     def VersionRangePrefixHelper(self, versionPoint):
         '''
-    Accepts a range part from the version range. 
-    ['Jenkins-1.2.3' or 'Jenkins-1.2.3] 
-    Checks and recreates the version properly.
-    '''
+        Accepts a range part from the version range. 
+        ['Jenkins-1.2.3' or 'Jenkins-1.2.3] 
+        Checks and recreates the version properly.
+        '''
         VersionNumber = re.search(self.regexVersionPattern, versionPoint).group(
             1)  # Only select the first version group in case the suffix has another 1.2..
         VersionParts = versionPoint.split(VersionNumber)
@@ -75,11 +96,11 @@ class CheckVersion():
 
     def CheckVersionInRange(self):
         """
-    Iterates through the list in self.VersionRangeInput. 
-    Treats the beginning and end of range as seperate versions and constructs Spec object.
-    Checks the given range in the Spec object. Returns True, if found.
-    Else, goes through the next set of ranges.
-    """
+        Iterates through the list in self.VersionRangeInput. 
+        Treats the beginning and end of range as seperate versions and constructs Spec object.
+        Checks the given range in the Spec object. Returns True, if found.
+        Else, goes through the next set of ranges.
+        """
         VersionRangeList = []
         for versionPoint in self.VersionRangeInput:
             if versionPoint[0] == '[' and versionPoint[-1] == ']':  # Checks single vulnerability
@@ -95,9 +116,9 @@ class CheckVersion():
 
     def UnpackRange(self, versionPoint):
         """
-    Takes the versions with the corresponding brackets and unpacks it as a mathematical notation
-    This is done to comply with the semantic_version Spec object.
-    """
+        Takes the versions with the corresponding brackets and unpacks it as a mathematical notation
+        This is done to comply with the semantic_version Spec object.
+        """
         versionPoint = self.FixLonelyBracket(versionPoint)
 
         versionPoint = self.VersionRangePrefixHelper(versionPoint)
@@ -117,10 +138,10 @@ class CheckVersion():
 
     def FixLonelyBracket(self, versionPoint):
         """
-    Addresses individual bracket from open ranges. 
-    Example: Range: [,1.2.3]
-    Then '[' would be the versionPoint.
-    """
+        Addresses individual bracket from open ranges. 
+        Example: Range: [,1.2.3]
+        Then '[' would be the versionPoint.
+        """
         if len(versionPoint) == 1:  # type of range: [,XXX] - gets only bracket : '['
             if versionPoint[0] == '[' or versionPoint[0] == '(':
                 versionPoint = versionPoint[0] + '0'
@@ -132,8 +153,8 @@ class CheckVersion():
 
 if __name__ == "__main__":
     """
-  Test
-  """
+    Test
+    """
     VersionRange = ['[3.2-alpha,3.3-beta-2)']
     Versions = CheckVersion(VersionRange, '3.3-alpha')
 
