@@ -81,6 +81,13 @@ class CheckVersion():
 
     def reconstructVersion(self, Version, Bracket=None, Prefix=None, Suffix=None):
         VersionList = []
+        #Standardizing versions
+        if '_' in Version:
+            Version = Version.split('_')
+            Version = '.'.join(Version)
+        elif "-" in Version:
+            Version = Version.split('-')
+            Version = '.'.join(Version)
         VersionList.append(Version)
         if Suffix:
             VersionList.append(Suffix)
@@ -149,6 +156,10 @@ class CheckVersion():
                 versionPoint = '10000000' + versionPoint[
                     0]  # Arbitrarily huge number to satisfy open ended upper limit.
         return versionPoint
+
+    def __str__(self):
+        PrintStatement = "Checking {} in {}".format(str(self.VersionToCheck), str(self.RawVersionRange))
+        return PrintStatement
 
 
 if __name__ == "__main__":
