@@ -83,17 +83,31 @@ class CheckVersion():
         FinalVersion = self.reconstructVersion(VersionNumber, Bracket=Bracket, Prefix=Prefix, Suffix=Suffix)
         return FinalVersion
 
+    def FixLeadingZeros(self, Version):
+        """
+        Some versions are checked as XX.0X.XXX
+        This when referenced with SNYK data only shows XX.X.XXX
+        Example: 1.01.11 can be inferred as 1.11.11 as is the semantic version convention.
+        """
+        NewVersion = []
+        for i in Version:
+            if i[0] == '0' and i[1:]:
+                i = i[1:]
+            NewVersion.append(i)
+        #print("NEW VERSION: ", NewVersion)
+        return '.'.join(NewVersion)
+        
     def reconstructVersion(self, Version, Bracket=None, Prefix=None, Suffix=None):
+        
         VersionList = []
         #Standardizing versions
         if '_' in Version:
             Version = Version.split('_')
-            Version = '.'.join(Version)
         elif "-" in Version:
             Version = Version.split('-')
-            Version = '.'.join(Version)
-
-        #if len(Version.split('.')) > 3:
+        elif "." in Version:
+            Version = Version.split('.')
+        Version = self.FixLeadingZeros(Version)
 
         VersionList.append(Version)
         if Suffix:
@@ -182,8 +196,8 @@ if __name__ == "__main__":
     Test
     """
 
-    VersionRange = ['[,2.6.7.1-jacksondatabind), [2.7,2.7.9.1), [2.8,2.8.10), [2.9.0.pr1,2.9.0)']
-    Versions = CheckVersion(VersionRange, '2.4.6.1-jacksondatabind')
+    VersionRange = ['[,2-67-1-jacksondatabind), [2.7,2.7.9.1), [2.8,2.8.10), [2.9.0.pr1,2.9.0)']
+    Versions = CheckVersion(VersionRange, '2-4-6-1-jacksondatabind')
     print(Versions)
     print(Versions.CheckVersionInRange())
     print("Checking {} in {}".format('3.3-alpha', str(VersionRange)))
